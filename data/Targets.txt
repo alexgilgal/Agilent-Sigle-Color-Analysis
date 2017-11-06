@@ -1,0 +1,6 @@
+FileName	Cy3	Cy5
+HB6_166_Cy_output.xls	Ref	AC
+HB6_167_Cy_output.xls	Ref	AC
+HB6_170_Cy_output.xls	Ref	Cntrl
+HB6_176_Cy_output.xls	Ref	Cntrl
+
