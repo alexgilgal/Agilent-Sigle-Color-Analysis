@@ -237,6 +237,9 @@ ui <- fluidPage(
       ### Fasta annot tab ----
       
       tabPanel('FASTA files',
+               
+               h3('FASTA Annotation'),
+               
                p('First of all, you will need to take a look to the 
                  annotation file. You will have to answer some questions
                  about the format and content.'),
@@ -293,8 +296,21 @@ ui <- fluidPage(
       ### Advanced results tab -----------
       
       tabPanel('Advanced Results',
+               
+               h3('Advanced Results'),
+               
                p('The goal of this section is to generate advanced results
-                 like volcano plots or heatmaps'))
+                 like volcano plots or heatmaps'),
+               
+               p('Select the comparison of interest, like before'),
+               
+               textInput('group3', 'Select the comparison'),
+               
+               plotOutput('volcano', height = "500px"),
+               
+               plotOutput('heatmap', height = "600px")
+               
+               )
   )
 )
 )
@@ -486,7 +502,7 @@ server <- function(input, output) {
   
   output$density_norm <- renderPlot({
     
-    print(class(norm()))
+
   
       
       limma::plotDensities(object = norm(),
@@ -836,8 +852,113 @@ server <- function(input, output) {
       
     }
     
+    )
+  
+  ## Volcano plot ----
+  
+  
+  output$volcano <- renderPlot({
     
-  )
+    
+    top_table <- toptable(DE_fit(), number = Inf,
+                          coef = input$group3,
+                          genelist = DE_fit()$genes)
+    
+    plot(x= top_table$logFC,
+         y = -log10(top_table[,input$fdr_pvalue]),
+         main = 'Volcano plot', 
+         xlab = 'log2(FC)',
+         ylab = '-log10(P Value)',
+         pch = 19,
+         col = 'coral',
+         cex = 0.55)
+    
+    abline(h = -log10(input$alpha), col = 'red',
+           lty = 2, lwd = 2)
+    
+    abline(v = input$fc, col = 'red',
+           lty = 2, lwd = 2)
+    
+    abline(v = -input$fc, col = 'red',
+           lty = 2, lwd = 2)
+    
+    activated <- top_table[top_table$logFC > input$fc &
+                             top_table[,input$fdr_pvalue] < input$alpha,]
+    
+    
+    represed  <- top_table[top_table$logFC < (-input$fc) &
+                             top_table[,input$fdr_pvalue] < input$alpha,]
+    ## Activated genes
+    
+    points(x = activated$logFC,
+           y = -log10(activated[,input$fdr_pvalue]),
+           col = 'lightgreen', cex = 0.6, pch = 19)
+    
+    ## Represed genes
+    
+    points(x = represed$logFC,
+           y = -log10(represed[,input$fdr_pvalue]),
+           col = 'lightblue', cex = 0.6, pch = 19)
+    
+    
+    
+  })
+  
+  ## Heatmap ----
+  
+  output$heatmap <- renderPlot({
+    
+    
+    top <- toptable(DE_fit(), coef = input$group3,
+                    number = 1000,
+                    genelist = DE_fit()$genes)
+    
+    print(head(top))
+    print(head(norm()$A))
+    
+    if(input$single_ch){
+      
+      data.clus <- norm()$E
+      
+      rownames(data.clus) <- rownames(norm()$genes)
+      
+      colnames(data.clus) <- norm()$targets$Cy3
+      
+    }else{
+      
+      data.clus <- norm()$A
+      
+      rownames(data.clus) <- rownames(norm()$genes)
+      
+      colnames(data.clus) <- norm()$targets$Cy5
+      
+      print(norm()$targets)
+    }
+  
+    
+    data.clus <- data.clus[rownames(top),]
+    
+    print(dim(data.clus))
+    
+    
+    clust.cols <- hclust(as.dist(1-cor(data.clus)),method="ward.D2")
+    
+    heatcol<-colorRampPalette(c("green", "Black","red"), space = "rgb")
+    
+    heatm<-heatmap.2(as.matrix(data.clus), col = heatcol(256),
+                     dendrogram="column", Colv=as.dendrogram(clust.cols),
+                     Rowv=NULL,
+                     scale="row",cexRow=0.1, cexCol=0.5,
+                     main="",key=TRUE,keysize=1,
+                     density.info="none",trace="none")
+    
+
+    
+    })
+  
+  br()
+  
+  
 }
 
 # Run the app
