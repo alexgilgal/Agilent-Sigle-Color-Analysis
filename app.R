@@ -5,6 +5,7 @@ library(limma)
 library(scatterplot3d)
 library(xlsx)
 library(gplots)
+library(seqinr)
 
 options(shiny.maxRequestSize=30*1024^2)
 
@@ -82,6 +83,8 @@ ui <- fluidPage(
     mainPanel(
       
       tabsetPanel(
+        
+        ## Intro panel ----
       
       tabPanel("Introduction",
                
@@ -159,6 +162,8 @@ ui <- fluidPage(
                
                ),
       
+      ## Raw data tab ----
+      
       tabPanel("Raw data",
       
       h3('Raw Data exploration'),
@@ -180,6 +185,9 @@ ui <- fluidPage(
                
                plotOutput('pca')
                ),
+      
+      
+      ## Differential expression tab ----
       
       tabPanel('Differential Expression Analysis',
                
@@ -209,6 +217,10 @@ ui <- fluidPage(
                textInput('top_contrast', 'Comparison of interest:',
                          value = 'AC-Cntrl'),
                
+               p('In this table below you will find the too 20 genes of the
+                 comparison. The column which contains the genes ID will be
+                 used in further steps.'),
+               
                tableOutput('top_table'),
                
                p('Here you can dowload the tables in a single xlsx file. If
@@ -220,7 +232,69 @@ ui <- fluidPage(
                br()
                
                
-               )
+               ),
+      
+      ### Fasta annot tab ----
+      
+      tabPanel('FASTA files',
+               p('First of all, you will need to take a look to the 
+                 annotation file. You will have to answer some questions
+                 about the format and content.'),
+               
+               p('Which is the character used for delimiting the fields?
+                 Usually is a tab but can be also a semicolon (;)'),
+               
+               selectInput('del', 'Delimitation character',
+                           choices = list('Tab' = '\t',
+                                          'Semicolon' = ';',
+                                          'Comma' = ',')),
+               
+               
+               
+               
+               
+               numericInput('skip', 'How many lines do the app have to
+                            skip reading in the annotation?',
+                            min = 0, max = Inf, value = 14),
+               
+               p('Take a look into the table of the top 20 genes
+                 in the previous table. Which column contains the ID of the
+                 genes?'),
+               
+               textInput('top_id', 'Insert the name of the column in 
+                         which you can found the names of the genes of
+                         interest.'),
+               
+               fileInput('annotation', 'Insert your annotation file'),
+               
+               tableOutput('columns'),
+               
+               textInput('col_id','Which column contains the ID name?',
+                         value = 'Reporter.Database.Entry..genbank.'),
+               
+               textInput('col_seq', 'Which column contains the sequences?',
+                         value = "Reporter.Sequence"),
+               
+               p('Now select the comparisson you are interested in. 
+                 From this comparisson we will extract the DEGs with
+                 the selected statistical significance and log2(FC). 
+                 You can see the groups you can compare in the previous tab
+                 (Differential Expression).'),
+               
+               textInput('group_fasta', 'Select the comparisson of interest.
+                         Only one.', value = 'AC-Cntrl'),
+               
+               
+               downloadButton('fasta_down', 'Download your DEGs and their 
+                              sequence')
+               
+               ),
+      
+      ### Advanced results tab -----------
+      
+      tabPanel('Advanced Results',
+               p('The goal of this section is to generate advanced results
+                 like volcano plots or heatmaps'))
   )
 )
 )
@@ -325,7 +399,7 @@ server <- function(input, output) {
   
   # Definition of the outputs ----
   
-  # Target example
+  # Target example ----
   
   output$target_example <- renderTable({
     
@@ -343,7 +417,7 @@ server <- function(input, output) {
                 Cy3 = c('AC', 'AC', 'Control', 'Control'))
   })
   
-  # Raw boxplot
+  # Raw boxplot ----
   
   output$raw_box <- renderPlot({
     
@@ -386,7 +460,7 @@ server <- function(input, output) {
   })
   
   
-  # Raw density plot
+  # Raw density plot -----
   
   output$density_raw <- renderPlot({
     
@@ -394,13 +468,13 @@ server <- function(input, output) {
   })
   
 
-  # raw MA plot
+  # raw MA plot ----
   
   output$MA_raw <- renderPlot({
     limma::plotMA(rg(), main = 'MAplot of raw data')
   })
   
-  # Normalized MA plot
+  # Normalized MA plot ----
   
   output$MA_norm <- renderPlot({
     
@@ -408,7 +482,7 @@ server <- function(input, output) {
     
   })
   
-  # normalized density plot
+  # normalized density plot ----
   
   output$density_norm <- renderPlot({
     
@@ -420,7 +494,7 @@ server <- function(input, output) {
  
   })
   
-  # PCA analysis
+  # PCA analysis ----
   
   # First we store the PCa information in a variable
   
@@ -594,6 +668,9 @@ server <- function(input, output) {
     
   })
   
+  
+  ## Head toptable ----
+  
   output$top_table <- renderTable({
     
     # if((input$single_ch & !(input$mul_comp))){
@@ -626,6 +703,8 @@ server <- function(input, output) {
     
     
   })
+  
+  # download table ---- 
   
   output$downloadData <- downloadHandler(
     
@@ -675,6 +754,89 @@ server <- function(input, output) {
     }
     
   
+  )
+  
+  # FASTA annotation section -----
+  
+  
+  
+  
+   ###### Table with the groups -----
+  
+  annot <- reactive({
+    
+    annot <- read.table(file = input$annotation$datapath,
+                        sep = input$del,
+                        skip = input$skip,
+                        header = T)
+    
+  })
+  
+  output$columns <- renderTable({
+
+
+   data.frame(Columns = colnames(annot()))
+
+
+  })
+  
+  ### FASTA dowload ----
+  
+  
+  output$fasta_down <- downloadHandler(
+    
+    filename = 'DEGs_seqs.fasta',
+    
+    content = function(file){
+      
+      colseq <- input$col_seq
+      
+      print(colseq)
+      
+      colid <- input$col_id
+      
+      print (colid)
+      
+      
+      top_table <- toptable(DE_fit(), number = Inf,
+                            coef = input$group_fasta,
+                            genelist = DE_fit()$genes)
+      
+      print(summary(annot()[,colid] %in% top_table[, input$top_id]))
+      
+      top_table <- top_table[ abs(top_table$logFC) > input$fc &
+                               top_table[,input$fdr_pvalue] < input$alpha,]
+      
+      degs <- top_table[, input$top_id]
+      
+      print(degs)
+      
+      
+      
+      
+      
+      deg_seq <- annot()[annot()[,colid] %in% degs,]
+      
+      print(summary(annot()[,colid] %in% degs))
+      
+      print(head(deg_seq, n= 20))
+      
+      
+      
+      deg_seq <- deg_seq[!(deg_seq[,colseq] == ''),]
+      
+      
+      print(summary(deg_seq[,colseq] == ''))
+      
+      return(seqinr::write.fasta(sequences = as.list(as.character(deg_seq[,colseq])),
+                  names = as.character(deg_seq[,colid]),
+                  file.out = file,
+                  open = 'w'))
+  
+      
+    }
+    
+    
   )
 }
 
