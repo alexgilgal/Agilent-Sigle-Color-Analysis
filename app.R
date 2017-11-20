@@ -30,7 +30,7 @@ filterByVar <-function (expres, threshold)
 
 # User interface ----
 ui <- fluidPage(
-  titlePanel("Microarray Analisys"),
+  titlePanel("Microarray Analisys (Beta)"),
   
   sidebarLayout(
     sidebarPanel(
@@ -343,13 +343,29 @@ ui <- fluidPage(
                  plotOutput('cluster'),
                  
                  
-                 plotOutput('heatmap', height = "600px"),
-                 
                  br()
                  
                  
                  
                  
+                 ),
+        
+        ## Heatmap  Tab -----
+        
+        tabPanel('Heatmap',
+                 
+                 h3('Heatmap generation'),
+                 
+                 p('Please remind that a great amount of features in the 
+                   heatmap will take a great ammount of time and even
+                   generate a crash of the app. Select a high filtering 
+                   value.'),
+                 
+                 numericInput('filt_heat', 'Select the percentaje of
+                              genes that will be filtered.',
+                              value = 99, min = 1, max = 99),
+                 
+                 plotOutput('heatmap', height = "600px")
                  )
         )
                  )
@@ -503,10 +519,10 @@ server <- function(input, output) {
       
     }else{
       
-      boxplot(norm()$M, main = 'Normalized data boxplot 
-              \n (M values)',
+      boxplot(norm()$A, main = 'Normalized data boxplot 
+              \n (A values)',
               ylab = 'log2(Intensity)', xaxt='n',
-              col = rainbow(ncol(norm()$M)) )
+              col = rainbow(ncol(norm()$A)) )
       
       
     }
@@ -917,7 +933,7 @@ server <- function(input, output) {
     
     SD <-apply(data.clus,1,sd)
     quantiles <-quantile(SD, probs = seq(0, 1, 0.01))
-    data.clus <- filterByVar(data.clus,quantiles["50%"])
+    data.clus <- filterByVar(data.clus,quantiles["10%"])
     
     print(dim(data.clus))
     
@@ -1000,49 +1016,6 @@ server <- function(input, output) {
     
   })
   
- 
-  
-  ## Heatmap ----
-  
-  output$heatmap <- renderPlot({
-    
-    if(input$single_ch){
-      
-      data.clus <- norm()$E
-      rownames(data.clus) <- rownames(norm()$genes)
-      colnames(data.clus) <- norm()$targets$Cy3
-      
-    }else{
-      
-      data.clus <- norm()$A
-      rownames(data.clus) <- rownames(norm()$genes)
-      colnames(data.clus) <- norm()$targets$Cy5
-      print(norm()$targets)
-      
-    }
-    
-    print('Data filtering heatmap')
-    
-    SD <-apply(data.clus,1,sd)
-    quantiles <-quantile(SD, probs = seq(0, 1, 0.01))
-    data.clus <- filterByVar(data.clus,quantiles["95%"])
-    
-    print('Heatmap started')
-    heatcol<-colorRampPalette(c("green", "Black","red"), space = "rgb")
-    
-    heatm<-heatmap.2(as.matrix(data.clus()), col = heatcol(256),
-                     dendrogram="column", Colv=as.dendrogram(cluster.cor()),
-                     Rowv=NULL,
-                     scale="row",cexRow=0.1, cexCol=0.5,
-                     main="Heatmap",key=TRUE,keysize=1,
-                     density.info="none",trace="none")
-    
-    print('Heatmap DONE')
-    
-    
-    
-  })
-  
   ### Hierachical cluster ----
   
   output$cluster <- renderPlot({
@@ -1071,6 +1044,50 @@ server <- function(input, output) {
     }
     print('Cluster DONE')
     plot(hclust(d = dist_matrix, method = input$clust_method))
+    
+  })
+  
+  ## Heatmap ----
+  
+  output$heatmap <- renderPlot({
+    
+    if(input$single_ch){
+      
+      data.clus <- norm()$E
+      rownames(data.clus) <- rownames(norm()$genes)
+      colnames(data.clus) <- norm()$targets$Cy3
+      
+    }else{
+      
+      data.clus <- norm()$A
+      rownames(data.clus) <- rownames(norm()$genes)
+      colnames(data.clus) <- norm()$targets$Cy5
+      print(norm()$targets)
+      
+    }
+    
+    print('Data filtering heatmap')
+    
+    SD <-apply(data.clus,1,sd)
+    quantiles <-quantile(SD, probs = seq(0, 1, 0.01))
+    data.clus <- filterByVar(data.clus,quantiles[paste(input$filt_heat, '%',
+                                                       sep = '')])
+    
+    print(dim(data.clus))
+    
+    print('Heatmap started')
+    heatcol<-colorRampPalette(c("green", "Black","red"), space = "rgb")
+    
+    heatm<-heatmap.2(as.matrix(data.clus), col = heatcol(256),
+                     dendrogram="column", Colv=as.dendrogram(cluster.cor()),
+                     Rowv=NULL,
+                     scale="row",cexRow=0.1, cexCol=0.5,
+                     main="Heatmap",key=TRUE,keysize=1,
+                     density.info="none",trace="none")
+    
+    print('Heatmap DONE')
+    
+    
     
   })
   
