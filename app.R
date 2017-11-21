@@ -186,6 +186,8 @@ ui <- fluidPage(
                  plotOutput('density_raw')
                  
         ),
+        
+        ## Normailed data tab ----
         tabPanel('Normalized data',
                  h3('Normalized data'),
                  plotOutput('norm_box'),
@@ -196,7 +198,9 @@ ui <- fluidPage(
                              choices = list('3D' = '3D',
                                             '2D' = '2D')),
                  
-                 plotOutput('pca')
+                 plotOutput('pca'),
+                 
+                 plotOutput('quantiles')
         ),
         
         
@@ -505,7 +509,8 @@ server <- function(input, output) {
       
       boxplot(cbind(log2(rg()$G), log2(rg()$R)), main = 'Raw data boxplot',
               ylab = 'log2(Intensity)', xaxt='n',
-              col = c(rep('green', dim(rg()$G)[2]), rep('red', dim(rg()$G)[2])))
+              col = c(rep('green', dim(rg()$G)[2]),
+                      rep('red', dim(rg()$G)[2])))
     }
   })
   
@@ -652,11 +657,23 @@ server <- function(input, output) {
            col = group_color)
     }
     
-    # And finally we add a legend in order to know which color correspond with
-    # each  group.
+    # And finally we add a legend in order to know which color correspond 
+    # with each  group.
     
     legend('topright', legend = levels(groups),
            pch = 16, col = colors)
+    
+    
+  })
+  
+  ## Quantile plot ----
+  
+  output$quantiles <- renderPlot({
+    
+    SD <-apply(norm(),1,sd)
+    quantiles <-quantile(SD, probs = seq(0, 1, 0.01))
+    
+    plot(quantiles)
     
     
   })
